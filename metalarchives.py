@@ -4,7 +4,7 @@ import logging
 import metallum
 from beets.autotag.hooks import AlbumInfo, TrackInfo, Distance, string_dist
 from beets.plugins import BeetsPlugin
-from beets import config
+from beets import config, ui
 from iso3166 import countries
 
 log = logging.getLogger('beets')
@@ -68,8 +68,14 @@ class MetalArchivesPlugin(BeetsPlugin):
             # If this track was matched from metal archives, we can just use
             # the track id
             if _is_source_id(item.mb_albumid):
+                self._log.debug(u'fetching lyrics: {0.artist} - {0.title}', item)
+
                 track_id = _strip_prefix(item.mb_trackid)
-                lyrics = metallum.lyrics_for_id(track_id)
+                try:
+                    lyrics = metallum.lyrics_for_id(track_id)
+                except metallum.NetworkError as e:
+                    self._log.debug('network error: {0}', e)
+                    continue
 
             # Otherwise perform an album search
             elif self.config['lyrics_search'].get(bool):
@@ -95,14 +101,22 @@ class MetalArchivesPlugin(BeetsPlugin):
                         if dist > 0.1:
                             continue
                         lyrics = track.lyrics
+            else:
+                continue
 
             if lyrics:
+                message = ui.colorize('text_success', 'found lyrics')
+
                 # TODO: check if track is instrumental and optionally replace
                 # with custom string
                 item.lyrics = unicode(lyrics)
                 if config['import']['write'].get(bool):
                     item.try_write()
                 item.store()
+            else:
+                message = ui.colorize('text_error', 'no lyrics found')
+
+            self._log.info(u'{0.artist} - {0.title}: {1}', item, message)
 
     def album_for_id(self, album_id):
         """Fetches an album by its Metal Archives ID and returns an AlbumInfo object
@@ -111,19 +125,30 @@ class MetalArchivesPlugin(BeetsPlugin):
         if not _is_source_id(album_id):
             return
 
-        result = metallum.album_for_id(_strip_prefix(album_id))
+        try:
+            result = metallum.album_for_id(_strip_prefix(album_id))
+        except metallum.NetworkError as e:
+            self._log.debug('network error: {0}', e)
+            return
 
-        if result:
-            return self.get_album_info(result)
+        return self.get_album_info(result)
 
     def get_albums(self, artist, album):
         """Returns a list of AlbumInfo objects for a Metal Archives search query.
         """
         albums = []
-        results = metallum.album_search(album, band=artist, strict=False, band_strict=False)
+        try:
+            results = metallum.album_search(album, band=artist, strict=False, band_strict=False)
+        except metallum.NetworkError as e:
+            self._log.debug('network error: {0}', e)
+            return
 
         for result in results:
-            album = result.get()
+            try:
+                album = result.get()
+            except metallum.NetworkError as e:
+                self._log.debug('network error: {0}', e)
+                continue
             albums.append(self.get_album_info(album))
 
         return albums
