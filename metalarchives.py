@@ -102,14 +102,12 @@ class MetalArchivesPlugin(BeetsPlugin):
                 self._log.debug('network error: {0}', e)
                 return
 
-            track_index = item.track - 1
-
             for result in results:
                 # TODO: use Distance object to calculate actual album distance
                 # using all data fields (title, year, number of tracks, etc)
                 album = result.get()
-                if len(album.tracks) >= track_index:
-                    track = album.tracks[track_index]
+                if len(album.tracks) >= item.track:
+                    track = album.tracks[item.track - 1]
                     dist = string_dist(item.title, unicode(track.title))
                     # TODO: make threshold config key
                     if dist > 0.1:
