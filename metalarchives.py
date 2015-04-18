@@ -127,7 +127,7 @@ class MetalArchivesPlugin(BeetsPlugin):
         else:
             message = ui.colorize('text_error', 'no lyrics found')
 
-        self._log.info(u'{0.artist} - {0.title}: {1}', item, message)
+        self._log.info(u'{0.artist} - {0.album} - {0.title}: {1}', item, message)
 
     def fetch_lyrics(self, session, task):
         """Fetch lyrics from Metal Archives for each track
