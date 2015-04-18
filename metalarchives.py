@@ -38,12 +38,27 @@ class MetalArchivesPlugin(BeetsPlugin):
             'source_weight': 1.0,
             'lyrics': False,
             'lyrics_search': False,
+            'instrumental': '',
         })
 
         stages = []
         if self.config['lyrics'].get(bool):
             stages.append(self.fetch_lyrics)
         self.import_stages = stages
+
+    def commands(self):
+        cmd = ui.Subcommand('metalarchives', help='metal archives data source')
+        cmd.parser.add_option('-l', '--lyrics', dest='lyrics',
+                              action='store_true', default=False,
+                              help='fetch track lyrics from metal archives')
+
+        def func(lib, opts, args):
+            if opts.lyrics:
+                for item in lib.items(ui.decargs(args)):
+                    self.fetch_item_lyrics(item)
+
+        cmd.func = func
+        return [cmd]
 
     def album_distance(self, items, album_info, mapping):
         """Returns the album distance.
@@ -59,64 +74,68 @@ class MetalArchivesPlugin(BeetsPlugin):
         """
         return self.get_albums(artist, album)
 
-    def fetch_lyrics(self, session, task):
+    def fetch_item_lyrics(self, item):
         """Fetch track lyrics from Metal Archives
         """
+        lyrics = ''
+
+        # If this track was matched from metal archives, we can just use
+        # the track id
+        if _is_source_id(item.mb_albumid):
+            self._log.debug(u'fetching lyrics: {0.artist} - {0.title}', item)
+
+            track_id = _strip_prefix(item.mb_trackid)
+            try:
+                lyrics = metallum.lyrics_for_id(track_id)
+            except metallum.NetworkError as e:
+                self._log.debug('network error: {0}', e)
+                return
+
+        # Otherwise perform an album search
+        elif self.config['lyrics_search'].get(bool):
+            self._log.debug(u'searching for lyrics: {0.artist} - {0.title}', item)
+
+            try:
+                results = metallum.album_search(item.album, band=item.artist, strict=False,
+                                                year_from=item.year, year_to=item.year)
+            except metallum.NetworkError as e:
+                self._log.debug('network error: {0}', e)
+                return
+
+            track_index = item.track - 1
+
+            for result in results:
+                # TODO: use Distance object to calculate actual album distance
+                # using all data fields (title, year, number of tracks, etc)
+                album = result.get()
+                if len(album.tracks) >= track_index:
+                    track = album.tracks[track_index]
+                    dist = string_dist(item.title, unicode(track.title))
+                    # TODO: make threshold config key
+                    if dist > 0.1:
+                        continue
+                    lyrics = track.lyrics
+        else:
+            return
+
+        if lyrics:
+            message = ui.colorize('text_success', 'found lyrics')
+            if lyrics == u'(<em>Instrumental</em>)':
+                lyrics = self.config['instrumental'].get()
+            item.lyrics = unicode(lyrics)
+            if config['import']['write'].get(bool):
+                item.try_write()
+            item.store()
+        else:
+            message = ui.colorize('text_error', 'no lyrics found')
+
+        self._log.info(u'{0.artist} - {0.title}: {1}', item, message)
+
+    def fetch_lyrics(self, session, task):
+        """Fetch lyrics from Metal Archives for each track
+        """
         for item in task.imported_items():
-            lyrics = ''
-
-            # If this track was matched from metal archives, we can just use
-            # the track id
-            if _is_source_id(item.mb_albumid):
-                self._log.debug(u'fetching lyrics: {0.artist} - {0.title}', item)
-
-                track_id = _strip_prefix(item.mb_trackid)
-                try:
-                    lyrics = metallum.lyrics_for_id(track_id)
-                except metallum.NetworkError as e:
-                    self._log.debug('network error: {0}', e)
-                    continue
-
-            # Otherwise perform an album search
-            elif self.config['lyrics_search'].get(bool):
-                self._log.debug(u'searching for lyrics: {0.artist} - {0.title}', item)
-
-                try:
-                    results = metallum.album_search(item.album, band=item.artist, strict=False,
-                                                    year_from=item.year, year_to=item.year)
-                except metallum.NetworkError as e:
-                    self._log.debug('network error: {0}', e)
-                    continue
-
-                track_index = item.track - 1
-
-                for result in results:
-                    # TODO: use Distance object to calculate actual album distance
-                    # using all data fields (title, year, number of tracks, etc)
-                    album = result.get()
-                    if len(album.tracks) >= track_index:
-                        track = album.tracks[track_index]
-                        dist = string_dist(item.title, unicode(track.title))
-                        # TODO: make threshold config key
-                        if dist > 0.1:
-                            continue
-                        lyrics = track.lyrics
-            else:
-                continue
-
-            if lyrics:
-                message = ui.colorize('text_success', 'found lyrics')
-
-                # TODO: check if track is instrumental and optionally replace
-                # with custom string
-                item.lyrics = unicode(lyrics)
-                if config['import']['write'].get(bool):
-                    item.try_write()
-                item.store()
-            else:
-                message = ui.colorize('text_error', 'no lyrics found')
-
-            self._log.info(u'{0.artist} - {0.title}: {1}', item, message)
+            self.fetch_item_lyrics(item)
 
     def album_for_id(self, album_id):
         """Fetches an album by its Metal Archives ID and returns an AlbumInfo object
