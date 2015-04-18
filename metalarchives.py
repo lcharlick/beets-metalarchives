@@ -79,6 +79,10 @@ class MetalArchivesPlugin(BeetsPlugin):
         """
         lyrics = ''
 
+        # Skip if lyrics are already present
+        if item.lyrics:
+            return
+
         # If this track was matched from metal archives, we can just use
         # the track id
         if _is_source_id(item.mb_albumid):
