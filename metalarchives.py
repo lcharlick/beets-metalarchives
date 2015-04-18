@@ -12,6 +12,25 @@ log = logging.getLogger('beets')
 DATA_SOURCE = 'Metal Archives'
 ID_PREFIX = 'ma-'
 
+
+def _add_prefix(id):
+    """Add source id prefix to id
+    """
+    return ID_PREFIX + str(id)
+
+
+def _strip_prefix(id):
+    """Strip source id prefix from id
+    """
+    return id[len(ID_PREFIX):]
+
+
+def _is_source_id(id):
+    """Check if an id string contains the source id prefix
+    """
+    return id[:len(ID_PREFIX)] == ID_PREFIX
+
+
 class MetalArchivesPlugin(BeetsPlugin):
     def __init__(self):
         super(MetalArchivesPlugin, self).__init__()
@@ -83,10 +102,10 @@ class MetalArchivesPlugin(BeetsPlugin):
         """Fetches an album by its Metal Archives ID and returns an AlbumInfo object
         or None if the album is not found.
         """
-        if not self._is_source_id(album_id):
+        if not _is_source_id(album_id):
             return
 
-        result = metallum.album_for_id(self._strip_prefix(album_id))
+        result = metallum.album_for_id(_strip_prefix(album_id))
 
         if result:
             return self.get_album_info(result)
@@ -108,8 +127,8 @@ class MetalArchivesPlugin(BeetsPlugin):
         """
         artist = album.bands[0]
         tracks = self.get_tracks(album.tracks)
-        album_id = self._add_prefix(album.id)
-        artist_id = self._add_prefix(artist.id)
+        album_id = _add_prefix(album.id)
+        artist_id = _add_prefix(artist.id)
 
         try:
             country = countries.get(artist.country).alpha2
@@ -132,22 +151,7 @@ class MetalArchivesPlugin(BeetsPlugin):
     def get_track_info(self, track):
         """Returns a TrackInfo object for a Metal Archives track object.
         """
-        track_id = self._add_prefix(track.id)
-        artist_id = self._add_prefix(track.band.id)
+        track_id = _add_prefix(track.id)
+        artist_id = _add_prefix(track.band.id)
         return TrackInfo(unicode(track.title), track_id, unicode(track.band.name), artist_id, track.duration, track.overall_number,
                          track.disc_number, track.number)
-
-    def _add_prefix(self, id):
-        """Add source id prefix to id
-        """
-        return ID_PREFIX + str(id)
-
-    def _strip_prefix(self, id):
-        """Strip source id prefix from id
-        """
-        return id[len(ID_PREFIX):]
-
-    def _is_source_id(self, id):
-        """Check if an id string contains the source id prefix
-        """
-        return id[:len(ID_PREFIX)] == ID_PREFIX
