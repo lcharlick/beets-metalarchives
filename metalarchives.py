@@ -37,10 +37,11 @@ class MetalArchivesPlugin(BeetsPlugin):
         self.config.add({
             'source_weight': 1.0,
             'lyrics': False,
+            'lyrics_search': False,
         })
 
         stages = []
-        if self.config['lyrics']:
+        if self.config['lyrics'].get(bool):
             stages.append(self.fetch_lyrics)
         self.import_stages = stages
 
@@ -71,10 +72,15 @@ class MetalArchivesPlugin(BeetsPlugin):
                 lyrics = metallum.lyrics_for_id(track_id)
 
             # Otherwise perform an album search
-            # TODO: make lyrics search optional
-            else:
-                results = metallum.album_search(item.album, band=item.artist, strict=False,
-                                                year_from=item.year, year_to=item.year)
+            elif self.config['lyrics_search'].get(bool):
+                self._log.debug(u'searching for lyrics: {0.artist} - {0.title}', item)
+
+                try:
+                    results = metallum.album_search(item.album, band=item.artist, strict=False,
+                                                    year_from=item.year, year_to=item.year)
+                except metallum.NetworkError as e:
+                    self._log.debug('network error: {0}', e)
+                    continue
 
                 track_index = item.track - 1
 
