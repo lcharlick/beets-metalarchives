@@ -2,7 +2,7 @@
 """
 import logging
 import metallum
-from beets.autotag.hooks import AlbumInfo, TrackInfo, Distance
+from beets.autotag.hooks import AlbumInfo, TrackInfo, Distance, string_dist
 from beets.plugins import BeetsPlugin
 from beets import config
 from iso3166 import countries
@@ -43,20 +43,41 @@ class MetalArchivesPlugin(BeetsPlugin):
         """Fetch track lyrics from Metal Archives
         """
         for item in task.imported_items():
-            if not self._is_source_id(item.mb_albumid):
-                continue
+            lyrics = ''
 
-            track_id = self._strip_prefix(item.mb_trackid)
+            # If this track was matched from metal archives, we can just use
+            # the track id
+            if _is_source_id(item.mb_albumid):
+                track_id = _strip_prefix(item.mb_trackid)
+                lyrics = metallum.lyrics_for_id(track_id)
 
-            lyrics = metallum.lyrics_for_id(track_id)
+            # Otherwise perform an album search
+            # TODO: make lyrics search optional
+            else:
+                results = metallum.album_search(item.album, band=item.artist, strict=False,
+                                                year_from=item.year, year_to=item.year)
 
-            if not lyrics:
-                continue
+                track_index = item.track - 1
 
-            item.lyrics = unicode(lyrics)
-            if config['import']['write'].get(bool):
-                item.try_write()
-            item.store()
+                for result in results:
+                    # TODO: use Distance object to calculate actual album distance
+                    # using all data fields (title, year, number of tracks, etc)
+                    album = result.get()
+                    if len(album.tracks) >= track_index:
+                        track = album.tracks[track_index]
+                        dist = string_dist(item.title, unicode(track.title))
+                        # TODO: make threshold config key
+                        if dist > 0.1:
+                            continue
+                        lyrics = track.lyrics
+
+            if lyrics:
+                # TODO: check if track is instrumental and optionally replace
+                # with custom string
+                item.lyrics = unicode(lyrics)
+                if config['import']['write'].get(bool):
+                    item.try_write()
+                item.store()
 
     def album_for_id(self, album_id):
         """Fetches an album by its Metal Archives ID and returns an AlbumInfo object
