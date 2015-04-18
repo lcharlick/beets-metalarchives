@@ -95,11 +95,7 @@ class MetalArchivesPlugin(BeetsPlugin):
         """Returns a list of AlbumInfo objects for a Metal Archives search query.
         """
         albums = []
-
-        try:
-            results = metallum.album_search(album, band=artist, strict=False, band_strict=False)
-        except metallum.NoSearchResultsError:
-            return albums
+        results = metallum.album_search(album, band=artist, strict=False, band_strict=False)
 
         for result in results:
             album = result.get()
