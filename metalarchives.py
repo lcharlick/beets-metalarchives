@@ -116,7 +116,12 @@ class MetalArchivesPlugin(BeetsPlugin):
                     # TODO: make threshold config key
                     if dist > 0.1:
                         continue
-                    lyrics = track.lyrics
+
+                    try:
+                        lyrics = track.lyrics
+                    except metallum.NetworkError as e:
+                        self._log.debug('network error: {0}', e)
+                        return
         else:
             return
 
