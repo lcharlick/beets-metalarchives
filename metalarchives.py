@@ -1,4 +1,4 @@
-"""Adds Metal Archives album search support to the autotagger.
+"""Adds Metal Archives album search support to the beets autotagger.
 """
 import logging
 import metallum
@@ -112,7 +112,7 @@ class MetalArchivesPlugin(BeetsPlugin):
                 album = result.get()
                 if len(album.tracks) >= item.track:
                     track = album.tracks[item.track - 1]
-                    dist = string_dist(item.title, unicode(track.title))
+                    dist = string_dist(item.title, track.title)
                     # TODO: make threshold config key
                     if dist > 0.1:
                         continue
@@ -126,10 +126,11 @@ class MetalArchivesPlugin(BeetsPlugin):
             return
 
         if lyrics:
+            lyrics = str(lyrics)
             message = ui.colorize('text_success', 'found lyrics')
-            if lyrics == u'(<em>Instrumental</em>)':
+            if lyrics == '(<em>Instrumental</em>)':
                 lyrics = self.config['instrumental'].get()
-            item.lyrics = unicode(lyrics)
+            item.lyrics = lyrics
             if config['import']['write'].get(bool):
                 item.try_write()
             item.store()
@@ -192,10 +193,11 @@ class MetalArchivesPlugin(BeetsPlugin):
         except KeyError:
             country = ''
 
-        return AlbumInfo(unicode(album.title), album_id, unicode(album.band_names), artist_id, tracks,
+        band_names = " / ".join([band.name for band in album.bands])
+        return AlbumInfo(album.title, album_id, band_names, artist_id, tracks,
                          albumtype=album.type, va=False, year=album.year, month=album.date.month,
-                         day=album.date.day, label=unicode(album.label), mediums=album.disc_count,
-                         country=unicode(country), data_source=DATA_SOURCE, data_url=metallum.BASE_URL + '/' + album.url)
+                         day=album.date.day, label=album.label, mediums=album.disc_count,
+                         country=country, data_source=DATA_SOURCE, data_url=metallum.BASE_URL + '/' + album.url)
 
     def get_tracks(self, tracklist):
         """Returns a list of TrackInfo objects for a Metal Archives tracklist.
