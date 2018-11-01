@@ -212,5 +212,10 @@ class MetalArchivesPlugin(BeetsPlugin):
         """
         track_id = _add_prefix(track.id)
         artist_id = _add_prefix(track.band.id)
-        return TrackInfo(unicode(track.title), track_id, unicode(track.band.name), artist_id, track.duration, track.overall_number,
-                         track.disc_number, track.number)
+        return TrackInfo(track.title, track_id,
+                         artist=track.band.name,
+                         artist_id=artist_id,
+                         length=track.duration,
+                         index=track.overall_number,
+                         medium=track.disc_number,
+                         medium_index=track.number)
