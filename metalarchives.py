@@ -68,7 +68,7 @@ class MetalArchivesPlugin(BeetsPlugin):
             dist.add('source', self.config['source_weight'].as_number())
         return dist
 
-    def candidates(self, items, artist, album, va_likely):
+    def candidates(self, items, artist, album, va_likely, extra_tags=None):
         """Returns a list of AlbumInfo objects for Metal Archives search results
         matching an album and artist (if not various).
         """
@@ -165,7 +165,7 @@ class MetalArchivesPlugin(BeetsPlugin):
         """
         albums = []
         try:
-            results = metallum.album_search(album, band=artist, strict=False, band_strict=False)
+            results = metallum.album_search(album, band=artist, strict=False, band_strict=False, formats=['CD'])
         except metallum.NetworkError as e:
             self._log.debug('network error: {0}', e)
             return
@@ -194,7 +194,7 @@ class MetalArchivesPlugin(BeetsPlugin):
             country = ''
 
         band_names = " / ".join([band.name for band in album.bands])
-        return AlbumInfo(album.title, album_id, band_names, artist_id, tracks,
+        return AlbumInfo(tracks, album.title, album_id, band_names, artist.id,
                          albumtype=album.type, va=False, year=album.year, month=album.date.month,
                          day=album.date.day, label=album.label, mediums=album.disc_count,
                          country=country, data_source=DATA_SOURCE, data_url=metallum.BASE_URL + '/' + album.url)
